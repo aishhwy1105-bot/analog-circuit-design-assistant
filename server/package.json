@@ -1,0 +1,11 @@
+{
+  "name": "analog-circuit-design-assistant-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
