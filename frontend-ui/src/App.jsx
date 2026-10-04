@@ -23,6 +23,7 @@ export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginMessage, setLoginMessage] = useState('');
   const [pendingPrompt, setPendingPrompt] = useState(null);
+  const [logoutNotification, setLogoutNotification] = useState(false);
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('analogpilot_user');
@@ -260,6 +261,13 @@ export default function App() {
 
   // Request Pipeline Handler
   const handleSend = async (overrideText) => {
+    // Session security check: ensure user is authenticated before synthesizing
+    if (!user || !user.email) {
+      setLoginMessage('Please sign in to access the Circuit Copilot workspace.');
+      setIsLoginOpen(true);
+      return;
+    }
+
     const userText = (typeof overrideText === 'string' && overrideText.trim()) ? overrideText.trim() : promptInput.trim();
     if (!userText || isLoading) return;
 
@@ -450,10 +458,30 @@ export default function App() {
     setUser(null);
     setPendingPrompt(null);
     setViewMode('landing');
+    setLogoutNotification(true);
+    setTimeout(() => {
+      setLogoutNotification(false);
+    }, 4000);
   };
 
   return (
     <div className="copilot-container">
+      {/* Top Logout Notification Toast Banner */}
+      {logoutNotification && (
+        <div className="logout-toast-banner">
+          <span className="toast-dot">✓</span>
+          <span>You have been logged out successfully.</span>
+          <button
+            type="button"
+            className="toast-close"
+            onClick={() => setLogoutNotification(false)}
+            title="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {viewMode === 'landing' ? (
         <LandingPage
           onLaunchWorkspace={handleLaunchWorkspace}
