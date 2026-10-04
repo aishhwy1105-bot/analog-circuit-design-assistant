@@ -1,6 +1,6 @@
 # AI-Powered Analog Circuit Design & Optimization Assistant
 
-> **SNS DT 2.0 Framework | III Cohort Tech Pilot Project**  
+> **SNS DT 2.0 Framework | AnalogPilot 
 > An intelligent electronic circuit design system designed to automate domain parameter extraction, component sizing, datasheet search, and validation.
 
 ---
