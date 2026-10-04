@@ -1,5 +1,7 @@
 import express from 'express';
 import { generateAskAdvice, generatePlanRoadmap } from './agents.js';
+import { searchMouser } from './services/mouserService.js';
+import { runSpiceSimulation } from './services/spiceService.js';
 
 const app = express();
 const PORT = 5000;
@@ -34,6 +36,28 @@ app.post('/api/plan', async (req, res) => {
     res.json({ status: 'success', data });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// Mouser Component Sourcing Route
+app.post('/api/mouser/search', async (req, res) => {
+  try {
+    const { query, tier } = req.body || {};
+    const result = await searchMouser(query || '', tier || 'standard');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// SPICE Simulation & Transient Solver Route
+app.post('/api/spice/simulate', async (req, res) => {
+  try {
+    const params = req.body || {};
+    const result = await runSpiceSimulation(params);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
