@@ -5,6 +5,8 @@ import { synthesizeCircuit } from './utils/circuitSynthesis.js';
 import { enrichBomWithMouser } from './services/mouserClient.js';
 import { fetchSpiceSimulation } from './services/spiceClient.js';
 import WaveformViewer from './components/WaveformViewer.jsx';
+import LandingPage from './components/LandingPage.jsx';
+import LoginPage from './components/LoginPage.jsx';
 
 // Utility to scrub solid white backgrounds, fills, and rects from SchemDraw SVGs
 function cleanSvgBackground(rawSvg) {
@@ -16,7 +18,20 @@ function cleanSvgBackground(rawSvg) {
 }
 
 export default function App() {
-  // Navigation & Mode
+  // Navigation & View Mode
+  const [viewMode, setViewMode] = useState('landing'); // 'landing' | 'app'
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [loginMessage, setLoginMessage] = useState('');
+  const [pendingPrompt, setPendingPrompt] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('analogpilot_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [activeMode, setActiveMode] = useState('build'); // 'ask' | 'plan' | 'build'
   const [selectedPlanTier, setSelectedPlanTier] = useState('Standard');
   const [promptInput, setPromptInput] = useState('');
@@ -244,9 +259,9 @@ export default function App() {
   };
 
   // Request Pipeline Handler
-  const handleSend = async () => {
-    if (!promptInput.trim() || isLoading) return;
-    const userText = promptInput.trim();
+  const handleSend = async (overrideText) => {
+    const userText = (typeof overrideText === 'string' && overrideText.trim()) ? overrideText.trim() : promptInput.trim();
+    if (!userText || isLoading) return;
 
     setChatMessages((prev) => [...prev, { role: 'user', type: 'text', content: userText }]);
     setPromptInput('');
@@ -391,25 +406,104 @@ export default function App() {
     }
   };
 
+  const handleLaunchWorkspace = (promptFromLanding) => {
+    // Check if user is authenticated
+    if (!user || !user.email) {
+      setPendingPrompt(promptFromLanding || '');
+      setLoginMessage('Please sign in to access the Circuit Copilot workspace.');
+      setIsLoginOpen(true);
+      return;
+    }
+
+    setViewMode('app');
+    if (promptFromLanding && typeof promptFromLanding === 'string' && promptFromLanding.trim()) {
+      setPromptInput(promptFromLanding.trim());
+      setTimeout(() => {
+        handleSend(promptFromLanding.trim());
+      }, 50);
+    }
+  };
+
+  const handleLoginSuccess = (authenticatedUser) => {
+    setUser(authenticatedUser);
+    setIsLoginOpen(false);
+    setLoginMessage('');
+
+    // If there was a pending prompt or intent to launch workspace, enter workspace
+    if (pendingPrompt !== null) {
+      const p = pendingPrompt;
+      setPendingPrompt(null);
+      setViewMode('app');
+      if (p && typeof p === 'string' && p.trim()) {
+        setPromptInput(p.trim());
+        setTimeout(() => {
+          handleSend(p.trim());
+        }, 50);
+      }
+    } else {
+      setViewMode('app');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('analogpilot_user');
+    setUser(null);
+    setPendingPrompt(null);
+    setViewMode('landing');
+  };
+
   return (
     <div className="copilot-container">
-      {/* Top Header */}
-      <header className="top-header">
-        <div className="brand-group">
-          <span className="brand-icon">⚡</span>
-          <div className="brand-text">
-            <h1>Analog Circuit Copilot</h1>
-            <span className="brand-subtitle">AI-powered circuit design & SPICE simulation assistant</span>
-          </div>
-        </div>
-        <div className="status-pill">
-          <span className="pill-dot" />
-          <span>Engine Ready</span>
-        </div>
-      </header>
+      {viewMode === 'landing' ? (
+        <LandingPage
+          onLaunchWorkspace={handleLaunchWorkspace}
+          onOpenLogin={() => setIsLoginOpen(true)}
+          user={user}
+          onLogout={handleLogout}
+        />
+      ) : (
+        <>
+          {/* Top Header */}
+          <header className="top-header">
+            <div
+              className="brand-group clickable-brand"
+              onClick={() => setViewMode('landing')}
+              title="Return to AnalogPilot Landing Page"
+            >
+              <span className="brand-icon">⚡</span>
+              <div className="brand-text">
+                <div className="brand-title-row">
+                  <h1>AnalogPilot</h1>
+                  <span className="brand-v-tag">v1.0</span>
+                </div>
+                <span className="brand-subtitle">AI-powered circuit design & SPICE simulation assistant</span>
+              </div>
+            </div>
 
-      {/* Main 2-Column Dashboard Grid */}
-      <div className="dashboard-grid" ref={dashboardRef}>
+            <div className="header-right-actions">
+              <button className="nav-back-home-btn" onClick={() => setViewMode('landing')}>
+                ⌂ Home / Landing
+              </button>
+              {user ? (
+                <div className="user-profile-badge">
+                  <span className="user-dot" />
+                  <span className="user-email">{user.email || user.name}</span>
+                  <button className="nav-logout-btn" onClick={handleLogout} title="Sign Out">Sign Out</button>
+                </div>
+              ) : (
+                <button className="nav-login-btn small" onClick={() => setIsLoginOpen(true)}>
+                  Log In
+                </button>
+              )}
+              <div className="status-pill">
+                <span className="pill-dot" />
+                <span>Engine Ready</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Main 2-Column Dashboard Grid */}
+          <div className="dashboard-grid" ref={dashboardRef}>
         {/* Left Section: Schematic, SPICE & Engineering Metrics */}
         <section className="canvas-section" ref={canvasSectionRef}>
           {/* Circuit Workspace Card */}
@@ -719,7 +813,7 @@ export default function App() {
             />
             <button
               className="send-arrow"
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={isLoading || !promptInput.trim()}
             >
               {isLoading ? '...' : '➔'}
@@ -727,6 +821,19 @@ export default function App() {
           </div>
         </aside>
       </div>
+        </>
+      )}
+
+      {/* Global Auth Modal */}
+      <LoginPage
+        isOpen={isLoginOpen}
+        onClose={() => {
+          setIsLoginOpen(false);
+          setLoginMessage('');
+        }}
+        onLoginSuccess={handleLoginSuccess}
+        message={loginMessage}
+      />
     </div>
   );
 }
